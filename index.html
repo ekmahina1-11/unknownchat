@@ -1,42 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
 <title>UnknownChat</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-body { font-family: Arial, sans-serif; margin: 0; background: #f5f5f5; }
-#login, #chat { max-width: 400px; margin: 40px auto; background: #fff; padding: 20px; border-radius: 8px; }
-input, button { width: 100%; padding: 10px; margin: 6px 0; }
-#messages { height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 8px; margin-bottom: 8px; }
-.msg { margin-bottom: 6px; font-size: 14px; }
-.me { font-weight: bold; font-size: 14px; }
-#onlineStatus { margin-bottom: 10px; font-size: 14px; color: green; }
-#typingStatus { margin-bottom: 5px; font-size: 12px; color: #555; }
-</style>
-</head>
-<body>
-
-<div id="login">
-  <h2>UnknownChat Login</h2>
-  <input type="email" id="email" placeholder="Email">
-  <input type="password" id="password" placeholder="Password">
-  <button onclick="login()">Login</button>
-</div>
-
-<div id="chat" style="display:none;">
-  <h2>UnknownChat</h2>
-  <div id="onlineStatus"></div>
-  <div id="typingStatus"></div>
-  <div id="messages"></div>
-  <input type="text" id="messageInput" placeholder="Type message" oninput="updateTyping()">
-  <button onclick="sendMessage()">Send</button>
-  <button onclick="logout()">Logout</button>
-</div>
-
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<style>
+body{margin:0;font-family:Arial;background:#ece5dd}
+#login,#chat{max-width:420px;margin:auto;height:100vh}
+#login{display:flex;flex-direction:column;justify-content:center;padding:20px}
+input,button{padding:10px;margin:6px 0;font-size:16px}
+button{background:#128c7e;color:#fff;border:none}
+#chat{display:none;flex-direction:column}
+#header{background:#075e54;color:#fff;padding:10px}
+#status{font-size:12px}
+#messages{flex:1;overflow-y:auto;padding:10px}
+.msg{max-width:70%;padding:8px;border-radius:8px;margin:6px 0;font-size:14px}
+.right{margin-left:auto;background:#dcf8c6}
+.left{margin-right:auto;background:#fff}
+.small{font-size:10px;color:#555;text-align:right}
+#typing{font-size:12px;color:#555;padding-left:10px}
+#sendBox{display:flex}
+#sendBox input{flex:1}
+</style>
+</head>
+
+<body>
+
+<div id="login">
+  <h2>UnknownChat</h2>
+  <input id="username" placeholder="Username">
+  <input id="password" type="password" placeholder="Password">
+  <button onclick="login()">Login</button>
+  <p id="error"></p>
+</div>
+
+<div id="chat">
+  <div id="header">
+    <div id="name"></div>
+    <div id="status">offline</div>
+  </div>
+  <div id="messages"></div>
+  <div id="typing"></div>
+  <div id="sendBox">
+    <input id="msg" placeholder="Type a message" oninput="typing(true)">
+    <button onclick="send()">Send</button>
+  </div>
+</div>
 
 <script>
 const firebaseConfig = {
@@ -48,93 +60,77 @@ const firebaseConfig = {
   appId: "1:134440126866:web:54c83a3ab12d7bdfc3194b"
 };
 firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
+const auth=firebase.auth();
+const db=firebase.firestore();
 
-const userNames = {
-  "unknownmarch001@gmail.com": "Bacha",
-  "unknownmarch1@gmail.com": "Kakka"
+const users={
+  foreverus10:{email:"unknownmarch1@gmail.com",name:"Bacha"},
+  foreverus29:{email:"unknownmarch001@gmail.com",name:"Kakka"}
 };
 
-function login() {
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
-  auth.signInWithEmailAndPassword(email, password)
-    .then(() => {
-      document.getElementById('login').style.display = 'none';
-      document.getElementById('chat').style.display = 'block';
-      setOnlineStatus(true);
-      loadMessages();
-    })
-    .catch(err => alert(err.message));
+let me="",other="",myName="",otherName="";
+
+function login(){
+  const u=username.value;
+  const p=password.value;
+  if(!users[u]){error.innerText="Invalid user";return;}
+  auth.signInWithEmailAndPassword(users[u].email,p).then(()=>{
+    me=u;
+    myName=users[u].name;
+    other=Object.keys(users).find(x=>x!==u);
+    otherName=users[other].name;
+    document.getElementById("login").style.display="none";
+    document.getElementById("chat").style.display="flex";
+    name.innerText=otherName;
+    online(true);
+    load();
+  }).catch(e=>error.innerText=e.message);
 }
 
-function logout() {
-  setOnlineStatus(false);
-  auth.signOut().then(() => location.reload());
-}
-
-function sendMessage() {
-  const text = document.getElementById('messageInput').value;
-  if (!text) return;
-  db.collection('messages').add({
-    text: text,
-    user: auth.currentUser.email,
-    time: firebase.firestore.FieldValue.serverTimestamp()
+function send(){
+  if(!msg.value)return;
+  db.collection("messages").add({
+    from:me,
+    text:msg.value,
+    time:Date.now(),
+    seen:false
   });
-  document.getElementById('messageInput').value = '';
-  setTyping(false);
+  msg.value="";
+  typing(false);
 }
 
-function loadMessages() {
-  const messagesDiv = document.getElementById('messages');
-  db.collection('messages').orderBy('time')
-    .onSnapshot(snapshot => {
-      messagesDiv.innerHTML = '';
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        const displayName = userNames[data.user] || data.user;
-        const div = document.createElement('div');
-        div.className = 'msg';
-        if(data.user === auth.currentUser.email) div.classList.add('me');
-        div.textContent = displayName + ': ' + data.text;
-        messagesDiv.appendChild(div);
-      });
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    });
-}
-
-function setOnlineStatus(isOnline) {
-  const onlineDiv = document.getElementById('onlineStatus');
-  onlineDiv.textContent = isOnline ? 'You are Online' : 'You are Offline';
-  db.collection('status').doc(auth.currentUser.email).set({online: isOnline});
-  db.collection('status').onSnapshot(snapshot => {
-    snapshot.forEach(doc => {
-      if(doc.id !== auth.currentUser.email) {
-        const data = doc.data();
-        onlineDiv.textContent = data.online ? userNames[doc.id] + ' is Online' : userNames[doc.id] + ' is Offline';
+function load(){
+  db.collection("messages").orderBy("time")
+  .onSnapshot(s=>{
+    messages.innerHTML="";
+    s.forEach(d=>{
+      const m=d.data();
+      const div=document.createElement("div");
+      div.className="msg "+(m.from===me?"right":"left");
+      div.innerHTML=m.text;
+      if(m.from===me){
+        div.innerHTML+=`<div class="small">${m.seen?"✔✔ Seen":"✔ Delivered"}</div>`;
+      }else{
+        d.ref.update({seen:true});
       }
+      messages.appendChild(div);
+      messages.scrollTop=messages.scrollHeight;
     });
+  });
+
+  db.collection("status").doc(other).onSnapshot(d=>{
+    status.innerText=d.data()?.online?"online":"offline";
+    typingDiv.innerText=d.data()?.typing?"typing...":"";
   });
 }
 
-let typingTimeout;
-function updateTyping() {
-  setTyping(true);
-  clearTimeout(typingTimeout);
-  typingTimeout = setTimeout(()=> setTyping(false), 1000);
+function online(v){
+  db.collection("status").doc(me).set({online:v,typing:false});
+  window.onbeforeunload=()=>db.collection("status").doc(me).set({online:false,typing:false});
 }
 
-function setTyping(isTyping) {
-  db.collection('typing').doc(auth.currentUser.email).set({typing: isTyping});
-  db.collection('typing').onSnapshot(snapshot => {
-    snapshot.forEach(doc => {
-      if(doc.id !== auth.currentUser.email) {
-        const data = doc.data();
-        document.getElementById('typingStatus').textContent = data.typing ? userNames[doc.id] + ' is typing...' : '';
-      }
-    });
-  });
+function typing(v){
+  db.collection("status").doc(me).update({typing:v});
 }
 </script>
 
