@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>UnknownChat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #f5f5f5; }
+    #login, #chat { max-width: 400px; margin: 40px auto; background: #fff; padding: 20px; border-radius: 8px; }
+    h2 { text-align: center; }
+    input, button { width: 100%; padding: 10px; margin: 8px 0; }
+    #messages { height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+    .msg { margin-bottom: 6px; }
+    .me { font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<div id="login">
+  <h2>UnknownChat Login</h2>
+  <input type="email" id="email" placeholder="Email" />
+  <input type="password" id="password" placeholder="Password" />
+  <button onclick="login()">Login</button>
+</div>
+
+<div id="chat" style="display:none;">
+  <h2>UnknownChat</h2>
+  <div id="messages"></div>
+  <input type="text" id="messageInput" placeholder="Type message" />
+  <button onclick="sendMessage()">Send</button>
+  <button onclick="logout()">Logout</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyB57DbuZWjQjaekNFkUrYmABql_yl-KFnA",
+    authDomain: "unknownchat-bbd4b.firebaseapp.com",
+    projectId: "unknownchat-bbd4b",
+    storageBucket: "unknownchat-bbd4b.firebasestorage.app",
+    messagingSenderId: "134440126866",
+    appId: "1:134440126866:web:54c83a3ab12d7bdfc3194b"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  function login() {
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    auth.signInWithEmailAndPassword(email, password)
+      .then(() => {
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('chat').style.display = 'block';
+        loadMessages();
+      })
+      .catch(err => alert(err.message));
+  }
+
+  function logout() {
+    auth.signOut().then(() => location.reload());
+  }
+
+  function sendMessage() {
+    const text = document.getElementById('messageInput').value;
+    if (!text) return;
+    db.collection('messages').add({
+      text: text,
+      user: auth.currentUser.email,
+      time: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById('messageInput').value = '';
+  }
+
+  function loadMessages() {
+    db.collection('messages').orderBy('time')
+      .onSnapshot(snapshot => {
+        const messagesDiv = document.getElementById('messages');
+        messagesDiv.innerHTML = '';
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const div = document.createElement('div');
+          div.className = 'msg';
+          if (data.user === auth.currentUser.email) div.className += ' me';
+          div.textContent = data.user + ': ' + data.text;
+          messagesDiv.appendChild(div);
+        });
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      });
+  }
+</script>
+
+</body>
+</html>
