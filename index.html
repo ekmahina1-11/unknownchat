@@ -1,21 +1,21 @@
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html><html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>UnknownChat</title>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
 <style>
-body{margin:0;font-family:Arial;background:#ece5dd}
+body{margin:0;font-family:Arial;background:#e5ddd5;height:100vh;overflow:hidden}
 #login,#chat{max-width:420px;margin:auto;height:100vh}
 #login{display:flex;flex-direction:column;justify-content:center;padding:20px}
-input,button{padding:10px;margin:6px 0;font-size:16px}
+input,button{padding:12px;margin:6px 0;font-size:16px}
 button{background:#128c7e;color:#fff;border:none}
 #chat{display:none;flex-direction:column}
-#header{background:#075e54;color:#fff;padding:10px}
-#status{font-size:12px}
+#header{background:#075e54;color:#fff;padding:12px}
+#headerName{font-size:16px;font-weight:bold}
+#headerStatus{font-size:12px}
 #messages{flex:1;overflow-y:auto;padding:10px}
 .msg{max-width:70%;padding:8px;border-radius:8px;margin:6px 0;font-size:14px}
 .right{margin-left:auto;background:#dcf8c6}
@@ -26,113 +26,56 @@ button{background:#128c7e;color:#fff;border:none}
 #sendBox input{flex:1}
 </style>
 </head>
-
 <body>
-
 <div id="login">
-  <h2>UnknownChat</h2>
-  <input id="username" placeholder="Username">
-  <input id="password" type="password" placeholder="Password">
-  <button onclick="login()">Login</button>
-  <p id="error"></p>
+<h2>UnknownChat</h2>
+<input id="username" placeholder="Username">
+<input id="password" type="password" placeholder="Password">
+<button onclick="login()">Login</button>
+<p id="error"></p>
 </div>
-
 <div id="chat">
-  <div id="header">
-    <div id="name"></div>
-    <div id="status">offline</div>
-  </div>
-  <div id="messages"></div>
-  <div id="typing"></div>
-  <div id="sendBox">
-    <input id="msg" placeholder="Type a message" oninput="typing(true)">
-    <button onclick="send()">Send</button>
-  </div>
+<div id="header">
+<div id="headerName"></div>
+<div id="headerStatus"></div>
 </div>
-
+<div id="messages"></div>
+<div id="typing"></div>
+<div id="sendBox">
+<input id="msg" placeholder="Type a message" oninput="typing(true)">
+<button onclick="send()">Send</button>
+</div>
+</div>
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyB57DbuZWjQjaekNFkUrYmABql_yl-KFnA",
-  authDomain: "unknownchat-bbd4b.firebaseapp.com",
-  projectId: "unknownchat-bbd4b",
-  storageBucket: "unknownchat-bbd4b.firebasestorage.app",
-  messagingSenderId: "134440126866",
-  appId: "1:134440126866:web:54c83a3ab12d7bdfc3194b"
-};
+const firebaseConfig={apiKey:"AIzaSyB57DbuZWjQjaekNFkUrYmABql_yl-KFnA",authDomain:"unknownchat-bbd4b.firebaseapp.com",projectId:"unknownchat-bbd4b",storageBucket:"unknownchat-bbd4b.firebasestorage.app",messagingSenderId:"134440126866",appId:"1:134440126866:web:54c83a3ab12d7bdfc3194b"};
 firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth();
 const db=firebase.firestore();
-
-const users={
-  foreverus10:{email:"unknownmarch1@gmail.com",name:"Bacha"},
-  foreverus29:{email:"unknownmarch001@gmail.com",name:"Kakka"}
-};
-
-let me="",other="",myName="",otherName="";
-
-function login(){
-  const u=username.value;
-  const p=password.value;
-  if(!users[u]){error.innerText="Invalid user";return;}
-  auth.signInWithEmailAndPassword(users[u].email,p).then(()=>{
-    me=u;
-    myName=users[u].name;
-    other=Object.keys(users).find(x=>x!==u);
-    otherName=users[other].name;
-    document.getElementById("login").style.display="none";
-    document.getElementById("chat").style.display="flex";
-    name.innerText=otherName;
-    online(true);
-    load();
-  }).catch(e=>error.innerText=e.message);
-}
-
-function send(){
-  if(!msg.value)return;
-  db.collection("messages").add({
-    from:me,
-    text:msg.value,
-    time:Date.now(),
-    seen:false
-  });
-  msg.value="";
-  typing(false);
-}
-
-function load(){
-  db.collection("messages").orderBy("time")
-  .onSnapshot(s=>{
-    messages.innerHTML="";
-    s.forEach(d=>{
-      const m=d.data();
-      const div=document.createElement("div");
-      div.className="msg "+(m.from===me?"right":"left");
-      div.innerHTML=m.text;
-      if(m.from===me){
-        div.innerHTML+=`<div class="small">${m.seen?"✔✔ Seen":"✔ Delivered"}</div>`;
-      }else{
-        d.ref.update({seen:true});
-      }
-      messages.appendChild(div);
-      messages.scrollTop=messages.scrollHeight;
-    });
-  });
-
+const users={foreverus10:{email:"unknownmarch1@gmail.com",chat:"Bacha"},foreverus29:{email:"unknownmarch001@gmail.com",chat:"Kakka"}};
+let me="",other="";
+function login(){const u=username.value,p=password.value;if(!users[u]){error.innerText="Invalid user";return;}auth.signInWithEmailAndPassword(users[u].email,p).then(()=>{me=u;other=Object.keys(users).find(x=>x!==u);document.getElementById("login").style.display="none";document.getElementById("chat").style.display="flex";headerName.innerText=users[other].chat;setStatus(true);load();}).catch(e=>error.innerText=e.message);}
+function send(){if(!msg.value)return;db.collection("messages").add({from:me,text:msg.value,time:Date.now(),seen:false});msg.value="";typing(false);} 
+function load(){db.collection("messages").where("from","in",[me,other]).orderBy("time").onSnapshot(s=>{messages.innerHTML="";s.forEach(d=>{const m=d.data();const div=document.createElement("div");div.className="msg "+(m.from===me?"right":"left");div.innerHTML=m.text;if(m.from===me){div.innerHTML+=`<div class='small'>${m.seen?"✔✔ Seen":"✔ Delivered"}</div>`;}else{d.ref.update({seen:true});}messages.appendChild(div);messages.scrollTop=messages.scrollHeight;});});
   db.collection("status").doc(other).onSnapshot(d=>{
-    status.innerText=d.data()?.online?"online":"offline";
-    typingDiv.innerText=d.data()?.typing?"typing...":"";
+    const data=d.data();
+    if(data?.online){
+      headerStatus.innerText="online";
+    } else if(data?.lastSeen){
+      const t=new Date(data.lastSeen);
+      const h=('0'+t.getHours()).slice(-2);
+      const m=('0'+t.getMinutes()).slice(-2);
+      headerStatus.innerText=`Last seen ${h}:${m}`;
+    } else {
+      headerStatus.innerText="offline";
+    }
+    typingDiv.innerText=data?.typing?"typing...":"";
   });
 }
-
-function online(v){
-  db.collection("status").doc(me).set({online:v,typing:false});
-  window.onbeforeunload=()=>db.collection("status").doc(me).set({online:false,typing:false});
+function setStatus(v){
+  db.collection("status").doc(me).set({online:v,typing:false,lastSeen:v?Date.now():Date.now()});
+  window.onbeforeunload=()=>db.collection("status").doc(me).set({online:false,typing:false,lastSeen:Date.now()});
 }
-
-function typing(v){
-  db.collection("status").doc(me).update({typing:v});
-}
+function typing(v){db.collection("status").doc(me).update({typing:v});}
 </script>
-
 </body>
 </html>
