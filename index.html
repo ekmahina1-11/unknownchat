@@ -69,22 +69,24 @@ function login(){
 }
 function send(){
  if(!msg.value)return;
- db.collection("messages").add({from:me,text:msg.value,time:Date.now(),seen:false});
+ db.collection("messages").add({from:me,to:other,text:msg.value,time:Date.now(),seen:false});
  msg.value="";
  typing(false);
 }
 function load(){
- db.collection("messages").where("from","in",[me,other]).orderBy("time").onSnapshot(s=>{
+ db.collection("messages").orderBy("time").onSnapshot(s=>{
   messages.innerHTML="";
   s.forEach(d=>{
    const m=d.data();
-   const div=document.createElement("div");
-   div.className="msg "+(m.from===me?"right":"left");
-   div.innerHTML=m.text;
-   if(m.from===me){div.innerHTML+=`<div class='small'>${m.seen?"✔✔ Seen":"✔ Delivered"}</div>`;}
-   else{d.ref.update({seen:true});}
-   messages.appendChild(div);
-   messages.scrollTop=messages.scrollHeight;
+   if((m.from===me && m.to===other)||(m.from===other && m.to===me)){
+    const div=document.createElement("div");
+    div.className="msg "+(m.from===me?"right":"left");
+    div.innerHTML=m.text;
+    if(m.from===me){div.innerHTML+=`<div class='small'>${m.seen?"✔✔ Seen":"✔ Delivered"}</div>`;}
+    else{d.ref.update({seen:true});}
+    messages.appendChild(div);
+    messages.scrollTop=messages.scrollHeight;
+   }
   });
  });
  db.collection("status").doc(other).onSnapshot(d=>{
