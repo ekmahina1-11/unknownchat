@@ -1,32 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>UnknownChat</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; background: #f5f5f5; }
-    #login, #chat { max-width: 400px; margin: 40px auto; background: #fff; padding: 20px; border-radius: 8px; }
-    h2 { text-align: center; }
-    input, button { width: 100%; padding: 10px; margin: 8px 0; }
-    #messages { height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
-    .msg { margin-bottom: 6px; }
-    .me { font-weight: bold; }
-  </style>
+<meta charset="UTF-8">
+<title>UnknownChat</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body { font-family: Arial, sans-serif; margin: 0; background: #f5f5f5; }
+#login, #chat { max-width: 400px; margin: 40px auto; background: #fff; padding: 20px; border-radius: 8px; }
+input, button { width: 100%; padding: 10px; margin: 6px 0; }
+#messages { height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 8px; margin-bottom: 8px; }
+.msg { margin-bottom: 6px; font-size: 14px; }
+.me { font-weight: bold; font-size: 14px; }
+#onlineStatus { margin-bottom: 10px; font-size: 14px; color: green; }
+#typingStatus { margin-bottom: 5px; font-size: 12px; color: #555; }
+</style>
 </head>
 <body>
 
 <div id="login">
   <h2>UnknownChat Login</h2>
-  <input type="email" id="email" placeholder="Email" />
-  <input type="password" id="password" placeholder="Password" />
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="password" placeholder="Password">
   <button onclick="login()">Login</button>
 </div>
 
 <div id="chat" style="display:none;">
   <h2>UnknownChat</h2>
+  <div id="onlineStatus"></div>
+  <div id="typingStatus"></div>
   <div id="messages"></div>
-  <input type="text" id="messageInput" placeholder="Type message" />
+  <input type="text" id="messageInput" placeholder="Type message" oninput="updateTyping()">
   <button onclick="sendMessage()">Send</button>
   <button onclick="logout()">Logout</button>
 </div>
@@ -36,62 +39,103 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyB57DbuZWjQjaekNFkUrYmABql_yl-KFnA",
-    authDomain: "unknownchat-bbd4b.firebaseapp.com",
-    projectId: "unknownchat-bbd4b",
-    storageBucket: "unknownchat-bbd4b.firebasestorage.app",
-    messagingSenderId: "134440126866",
-    appId: "1:134440126866:web:54c83a3ab12d7bdfc3194b"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyB57DbuZWjQjaekNFkUrYmABql_yl-KFnA",
+  authDomain: "unknownchat-bbd4b.firebaseapp.com",
+  projectId: "unknownchat-bbd4b",
+  storageBucket: "unknownchat-bbd4b.firebasestorage.app",
+  messagingSenderId: "134440126866",
+  appId: "1:134440126866:web:54c83a3ab12d7bdfc3194b"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
+const userNames = {
+  "unknownmarch001@gmail.com": "Bacha",
+  "unknownmarch1@gmail.com": "Kakka"
+};
 
-  function login() {
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    auth.signInWithEmailAndPassword(email, password)
-      .then(() => {
-        document.getElementById('login').style.display = 'none';
-        document.getElementById('chat').style.display = 'block';
-        loadMessages();
-      })
-      .catch(err => alert(err.message));
-  }
+function login() {
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  auth.signInWithEmailAndPassword(email, password)
+    .then(() => {
+      document.getElementById('login').style.display = 'none';
+      document.getElementById('chat').style.display = 'block';
+      setOnlineStatus(true);
+      loadMessages();
+    })
+    .catch(err => alert(err.message));
+}
 
-  function logout() {
-    auth.signOut().then(() => location.reload());
-  }
+function logout() {
+  setOnlineStatus(false);
+  auth.signOut().then(() => location.reload());
+}
 
-  function sendMessage() {
-    const text = document.getElementById('messageInput').value;
-    if (!text) return;
-    db.collection('messages').add({
-      text: text,
-      user: auth.currentUser.email,
-      time: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    document.getElementById('messageInput').value = '';
-  }
+function sendMessage() {
+  const text = document.getElementById('messageInput').value;
+  if (!text) return;
+  db.collection('messages').add({
+    text: text,
+    user: auth.currentUser.email,
+    time: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  document.getElementById('messageInput').value = '';
+  setTyping(false);
+}
 
-  function loadMessages() {
-    db.collection('messages').orderBy('time')
-      .onSnapshot(snapshot => {
-        const messagesDiv = document.getElementById('messages');
-        messagesDiv.innerHTML = '';
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          const div = document.createElement('div');
-          div.className = 'msg';
-          if (data.user === auth.currentUser.email) div.className += ' me';
-          div.textContent = data.user + ': ' + data.text;
-          messagesDiv.appendChild(div);
-        });
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+function loadMessages() {
+  const messagesDiv = document.getElementById('messages');
+  db.collection('messages').orderBy('time')
+    .onSnapshot(snapshot => {
+      messagesDiv.innerHTML = '';
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const displayName = userNames[data.user] || data.user;
+        const div = document.createElement('div');
+        div.className = 'msg';
+        if(data.user === auth.currentUser.email) div.classList.add('me');
+        div.textContent = displayName + ': ' + data.text;
+        messagesDiv.appendChild(div);
       });
-  }
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+}
+
+function setOnlineStatus(isOnline) {
+  const onlineDiv = document.getElementById('onlineStatus');
+  onlineDiv.textContent = isOnline ? 'You are Online' : 'You are Offline';
+  db.collection('status').doc(auth.currentUser.email).set({online: isOnline});
+  db.collection('status').onSnapshot(snapshot => {
+    snapshot.forEach(doc => {
+      if(doc.id !== auth.currentUser.email) {
+        const data = doc.data();
+        onlineDiv.textContent = data.online ? userNames[doc.id] + ' is Online' : userNames[doc.id] + ' is Offline';
+      }
+    });
+  });
+}
+
+let typingTimeout;
+function updateTyping() {
+  setTyping(true);
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(()=> setTyping(false), 1000);
+}
+
+function setTyping(isTyping) {
+  db.collection('typing').doc(auth.currentUser.email).set({typing: isTyping});
+  db.collection('typing').onSnapshot(snapshot => {
+    snapshot.forEach(doc => {
+      if(doc.id !== auth.currentUser.email) {
+        const data = doc.data();
+        document.getElementById('typingStatus').textContent = data.typing ? userNames[doc.id] + ' is typing...' : '';
+      }
+    });
+  });
+}
 </script>
 
 </body>
