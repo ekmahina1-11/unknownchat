@@ -63,6 +63,12 @@ const db = firebase.firestore();
 // Users mapping
 const users = { "foreverus10":"Kakka", "foreverus29":"Bacha" };
 
+// Actual login passwords
+const validUsers = {
+  "foreverus10":"bachakakka102913",
+  "foreverus29":"bachakakka102913"
+};
+
 let currentUser="", friendUser="";
 const loginDiv = document.getElementById("login");
 const chatDiv = document.getElementById("chat");
@@ -86,7 +92,6 @@ togglePass.onclick = ()=>{ passwordInput.type = passwordInput.type==="password"?
 loginBtn.onclick = ()=>{
   const u = usernameInput.value.trim();
   const p = passwordInput.value.trim();
-  const validUsers = { "foreverus10":"123456", "foreverus29":"123456" }; // original passwords
   if(validUsers[u] && validUsers[u]===p){
     currentUser=u;
     friendUser=(u==="foreverus10")?"foreverus29":"foreverus10";
