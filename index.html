@@ -7,43 +7,50 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <style>
-body, html{margin:0;padding:0;height:100%;font-family:Arial;background:#e5ddd5;}
-#login,#chat{max-width:420px;margin:auto;height:100%;}
+body,html{margin:0;padding:0;height:100%;font-family:Arial;background:#e5ddd5}
+#login,#chat{max-width:420px;margin:auto;height:100%}
 #login{display:flex;flex-direction:column;justify-content:center;padding:20px}
 input,button{padding:12px;margin:6px 0;font-size:16px}
 button{background:#128c7e;color:#fff;border:none}
-#chat{display:none;flex-direction:column;height:100%}
-#header{background:#075e54;color:#fff;padding:12px}
-#headerName{font-size:16px;font-weight:bold}
+#chat{display:none;flex-direction:column}
+#header{background:#075e54;color:#fff;padding:10px;display:flex;justify-content:space-between;align-items:center}
+#headerLeft{display:flex;flex-direction:column}
+#headerName{font-weight:bold}
 #headerStatus{font-size:12px}
-#messages{flex:1;overflow-y:auto;padding:10px;background:#e5ddd5}
-.msg{max-width:70%;padding:8px;border-radius:8px;margin:6px 0;font-size:14px;word-wrap:break-word}
+#logout{font-size:12px;background:#0b5f55;padding:6px 10px}
+#messages{flex:1;overflow-y:auto;padding:10px}
+.msg{max-width:70%;padding:8px;border-radius:8px;margin:6px 0}
 .right{margin-left:auto;background:#dcf8c6}
 .left{margin-right:auto;background:#fff}
-.small{font-size:10px;color:#555;text-align:right}
-#typing{font-size:12px;color:#555;padding-left:10px;height:18px}
-#sendBox{display:flex;padding:5px;background:#fff}
-#sendBox input{flex:1;font-size:16px;padding:10px}
-#sendBox button{padding:10px;margin-left:5px}
+.small{font-size:10px;text-align:right}
+#typing{font-size:12px;color:#555;height:18px;padding-left:10px}
+#sendBox{display:flex;background:#fff;padding:5px}
+#sendBox input{flex:1}
 </style>
 </head>
 <body>
 <div id="login">
 <h2>UnknownChat</h2>
 <input id="username" placeholder="Username">
-<input id="password" type="password" placeholder="Password">
+<div style="display:flex;align-items:center">
+<input id="password" type="password" placeholder="Password" style="flex:1">
+<button onclick="togglePass()" style="width:60px">👁</button>
+</div>
 <button onclick="login()">Login</button>
 <p id="error"></p>
 </div>
 <div id="chat">
 <div id="header">
+<div id="headerLeft">
 <div id="headerName"></div>
 <div id="headerStatus"></div>
+</div>
+<button id="logout" onclick="logout()">Logout</button>
 </div>
 <div id="messages"></div>
 <div id="typing"></div>
 <div id="sendBox">
-<input id="msg" placeholder="Type a message" oninput="typing(true)">
+<input id="msg" placeholder="Type a message" oninput="handleTyping()">
 <button onclick="send()">Send</button>
 </div>
 </div>
@@ -53,59 +60,16 @@ firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth();
 const db=firebase.firestore();
 const users={foreverus10:{email:"unknownmarch1@gmail.com",chat:"Bacha"},foreverus29:{email:"unknownmarch001@gmail.com",chat:"Kakka"}};
-let me="",other="";
-const typingDiv=document.getElementById('typing');
-function login(){
- const u=username.value,p=password.value;
- if(!users[u]){error.innerText="Invalid user";return;}
- auth.signInWithEmailAndPassword(users[u].email,p).then(()=>{
-  me=u;other=Object.keys(users).find(x=>x!==u);
-  document.getElementById("login").style.display="none";
-  document.getElementById("chat").style.display="flex";
-  headerName.innerText=users[other].chat;
-  setStatus(true);
-  load();
- }).catch(e=>error.innerText=e.message);
-}
-function send(){
- if(!msg.value)return;
- db.collection("messages").add({from:me,to:other,text:msg.value,time:Date.now(),seen:false});
- msg.value="";
- typing(false);
-}
-function load(){
- db.collection("messages").orderBy("time").onSnapshot(s=>{
-  messages.innerHTML="";
-  s.forEach(d=>{
-   const m=d.data();
-   if((m.from===me && m.to===other)||(m.from===other && m.to===me)){
-    const div=document.createElement("div");
-    div.className="msg "+(m.from===me?"right":"left");
-    div.innerHTML=m.text;
-    if(m.from===me){div.innerHTML+=`<div class='small'>${m.seen?"✔✔ Seen":"✔ Delivered"}</div>`;}
-    else{d.ref.update({seen:true});}
-    messages.appendChild(div);
-    messages.scrollTop=messages.scrollHeight;
-   }
-  });
- });
- db.collection("status").doc(other).onSnapshot(d=>{
-  const data=d.data();
-  if(data?.online){headerStatus.innerText="online";}
-  else if(data?.lastSeen){
-   const t=new Date(data.lastSeen);
-   const h=('0'+t.getHours()).slice(-2);
-   const m=('0'+t.getMinutes()).slice(-2);
-   headerStatus.innerText=`Last seen ${h}:${m}`;
-  } else {headerStatus.innerText="offline";}
-  typingDiv.innerText=data?.typing?"typing...":"";
- });
-}
-function setStatus(v){
- db.collection("status").doc(me).set({online:v,typing:false,lastSeen:Date.now()});
- window.onbeforeunload=()=>db.collection("status").doc(me).set({online:false,typing:false,lastSeen:Date.now()});
-}
-function typing(v){db.collection("status").doc(me).update({typing:v});}
+let me="",other="",typingTimer=null;
+function togglePass(){password.type=password.type==='password'?'text':'password'}
+function login(){const u=username.value,p=password.value;if(!users[u]){error.innerText='Invalid user';return;}auth.signInWithEmailAndPassword(users[u].email,p).then(()=>{me=u;other=Object.keys(users).find(x=>x!==u);login.style.display='none';chat.style.display='flex';headerName.innerText=users[other].chat;setOnline(true);load();});}
+function logout(){setOnline(false);auth.signOut();location.reload()}
+function send(){if(!msg.value)return;db.collection('messages').add({from:me,to:other,text:msg.value,time:Date.now(),seen:false});msg.value='';setTyping(false)}
+function load(){db.collection('messages').orderBy('time').onSnapshot(s=>{messages.innerHTML='';s.forEach(d=>{const m=d.data();if((m.from===me&&m.to===other)||(m.from===other&&m.to===me)){const div=document.createElement('div');div.className='msg '+(m.from===me?'right':'left');div.innerHTML=m.text;if(m.from===me){div.innerHTML+=`<div class='small'>${m.seen?'✔✔ Seen':'✔ Delivered'}</div>`;}else{d.ref.update({seen:true});}messages.appendChild(div);messages.scrollTop=messages.scrollHeight;}})});
+ db.collection('status').doc(other).onSnapshot(d=>{const s=d.data();if(s?.online){headerStatus.innerText='online';}else if(s?.lastSeen){const t=new Date(s.lastSeen);headerStatus.innerText='last seen '+t.toLocaleTimeString();}else{headerStatus.innerText='offline';}typing.innerText=s?.typing?'typing...':''});}
+function setOnline(v){db.collection('status').doc(me).set({online:v,typing:false,lastSeen:Date.now()});window.onbeforeunload=()=>db.collection('status').doc(me).set({online:false,typing:false,lastSeen:Date.now()})}
+function handleTyping(){setTyping(true);clearTimeout(typingTimer);typingTimer=setTimeout(()=>setTyping(false),1200)}
+function setTyping(v){db.collection('status').doc(me).update({typing:v})}
 </script>
 </body>
 </html>
