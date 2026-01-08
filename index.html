@@ -5,41 +5,49 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>UnknownChat</title>
 <style>
-body{margin:0;font-family:Arial,sans-serif;background:#f0f0f0;}
-#login,#chat{display:none;padding:20px;}
-#login{background:#fff;border-radius:10px;box-shadow:0 0 10px rgba(0,0,0,0.2);width:300px;margin:auto;margin-top:50px;}
-input{padding:10px;margin:5px 0;width:95%;}
-button{padding:10px;margin:5px 0;width:100%;}
+body{margin:0;font-family:Arial,sans-serif;background:#e0f7fa;}
+#login,#chat{display:none;}
+#login{width:320px;margin:80px auto;background:#fff;border-radius:12px;box-shadow:0 5px 15px rgba(0,0,0,0.3);padding:20px;text-align:center;position:relative;}
+#login h2{color:#00796b;}
+input{width:90%;padding:10px;margin:8px 0;border-radius:5px;border:1px solid #ccc;}
+button{padding:10px;margin-top:10px;width:95%;border:none;border-radius:5px;background:#00796b;color:white;font-weight:bold;cursor:pointer;}
+#loginStatus{margin-top:10px;font-size:0.9em;}
+#loadingBar{position:absolute;top:0;left:0;height:4px;width:0;background:#00796b;border-radius:2px;transition:width 0.3s;}
+#chat{max-width:600px;margin:20px auto;background:#f0f0f0;padding:15px;border-radius:10px;}
+.header{font-weight:bold;font-size:1.2em;margin-bottom:10px;}
+#chatStatus{font-size:0.9em;color:#555;}
 #messages{max-height:60vh;overflow-y:auto;margin-bottom:10px;}
-.msg{padding:8px 12px;border-radius:10px;margin:5px 0;max-width:70%;position:relative;}
+.msg{padding:8px 12px;border-radius:10px;margin:5px 0;max-width:70%;position:relative;word-break:break-word;}
 .mine{background:#dcf8c6;margin-left:auto;text-align:right;}
 .other{background:#fff;margin-right:auto;text-align:left;}
 .time{font-size:0.7em;color:gray;margin-top:2px;}
-.header{font-weight:bold;font-size:1.1em;margin-bottom:10px;}
-#typing{font-style:italic;color:gray;}
 .date-separator{text-align:center;font-size:0.8em;color:gray;margin:10px 0;}
+#typing{font-style:italic;color:gray;margin-bottom:5px;}
 .delete-btn{font-size:0.7em;color:red;cursor:pointer;margin-left:5px;}
-#loginStatus{color:red;margin-top:5px;font-size:0.9em;}
-#togglePass{cursor:pointer;font-size:1.2em;margin-left:5px;}
+#msgInput{width:80%;padding:10px;border-radius:5px;border:1px solid #ccc;}
+#sendBtn{padding:10px;border-radius:5px;border:none;background:#00796b;color:white;cursor:pointer;}
+#logoutBtn{padding:8px 12px;border-radius:5px;border:none;background:#d32f2f;color:white;cursor:pointer;float:right;margin-top:5px;}
+#togglePass{cursor:pointer;font-size:1.2em;margin-left:5px;position:absolute;right:35px;top:100px;}
 </style>
 </head>
 <body>
 
-<!-- Login Page -->
+<!-- Login -->
 <div id="login">
-  <h2>UnknownChat Login</h2>
-  <input type="text" id="username" placeholder="Username">
+  <div id="loadingBar"></div>
+  <h2>UnknownChat</h2>
+  <input type="text" id="username" placeholder="Username"><br>
   <input type="password" id="password" placeholder="Password">
   <span id="togglePass">👁️</span>
   <button id="loginBtn">Login</button>
   <div id="loginStatus"></div>
 </div>
 
-<!-- Chat Page -->
+<!-- Chat -->
 <div id="chat">
   <div class="header">
-    <span id="chatName"></span><br>
-    <span id="chatStatus" style="font-size:12px;color:#777;"></span>
+    <span id="chatName"></span> 
+    <span id="chatStatus"></span>
   </div>
   <div id="typing"></div>
   <div id="messages"></div>
@@ -53,7 +61,7 @@ button{padding:10px;margin:5px 0;width:100%;}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <script>
-// ✅ Firebase config
+// Firebase config (tumhara original project)
 const firebaseConfig = {
   apiKey: "AIzaSyB57DbuZWjQjaekNFkUrYmABql_yl-KFnA",
   authDomain: "unknownchat-bbd4b.firebaseapp.com",
@@ -65,73 +73,75 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// Users & Header Names
+// Users & Passwords
 const users = { "foreverus10":"Kakka", "foreverus29":"Bacha" };
-
-// Login passwords
-const validUsers = {
-  "foreverus10":"bachakakka102913",
-  "foreverus29":"bachakakka102913"
-};
+const validUsers = { "foreverus10":"bachakakka102913","foreverus29":"bachakakka102913" };
 
 let currentUser="", friendUser="";
-const loginDiv = document.getElementById("login");
-const chatDiv = document.getElementById("chat");
 
 // Elements
-const loginBtn = document.getElementById("loginBtn");
-const sendBtn = document.getElementById("sendBtn");
-const logoutBtn = document.getElementById("logoutBtn");
-const msgInput = document.getElementById("msgInput");
-const messagesDiv = document.getElementById("messages");
-const chatName = document.getElementById("chatName");
-const chatStatus = document.getElementById("chatStatus");
-const typingDiv = document.getElementById("typing");
-const usernameInput = document.getElementById("username");
-const passwordInput = document.getElementById("password");
-const togglePass = document.getElementById("togglePass");
-const loginStatus = document.getElementById("loginStatus");
+const loginDiv=document.getElementById("login");
+const chatDiv=document.getElementById("chat");
+const loginBtn=document.getElementById("loginBtn");
+const sendBtn=document.getElementById("sendBtn");
+const logoutBtn=document.getElementById("logoutBtn");
+const msgInput=document.getElementById("msgInput");
+const messagesDiv=document.getElementById("messages");
+const chatName=document.getElementById("chatName");
+const chatStatus=document.getElementById("chatStatus");
+const typingDiv=document.getElementById("typing");
+const usernameInput=document.getElementById("username");
+const passwordInput=document.getElementById("password");
+const togglePass=document.getElementById("togglePass");
+const loginStatus=document.getElementById("loginStatus");
+const loadingBar=document.getElementById("loadingBar");
 
 // Toggle password visibility
-togglePass.onclick = ()=>{ passwordInput.type = passwordInput.type==="password"?"text":"password"; }
+togglePass.onclick=()=>{ passwordInput.type = passwordInput.type==="password"?"text":"password"; }
 
 // Login
-loginBtn.onclick = ()=>{
-  const u = usernameInput.value.trim();
-  const p = passwordInput.value.trim();
+loginBtn.onclick=()=>{
+  loadingBar.style.width="30%";
+  const u=usernameInput.value.trim();
+  const p=passwordInput.value.trim();
   if(validUsers[u] && validUsers[u]===p){
+    loadingBar.style.width="70%";
     currentUser=u;
     friendUser=(u==="foreverus10")?"foreverus29":"foreverus10";
-    loginDiv.style.display="none";
-    chatDiv.style.display="block";
-    chatName.innerText = users[friendUser];
-    initChat();
-    setCurrentOnline();
+    setTimeout(()=>{
+      loginDiv.style.display="none";
+      chatDiv.style.display="block";
+      chatName.innerText=users[friendUser];
+      loadingBar.style.width="100%";
+      initChat();
+      setCurrentOnline();
+    },500);
   } else loginStatus.innerText="Invalid username or password";
 }
 
 // Logout
-logoutBtn.onclick = ()=>{ location.reload(); }
+logoutBtn.onclick=()=>{ location.reload(); }
 
-// Typing indicator & sending
+// Typing indicator
 let typingTimeout;
-msgInput.oninput = ()=>{
+msgInput.oninput=()=>{
   db.collection("status").doc(currentUser).set({typing:true},{merge:true});
   clearTimeout(typingTimeout);
-  typingTimeout = setTimeout(()=>{
+  typingTimeout=setTimeout(()=>{
     db.collection("status").doc(currentUser).set({typing:false},{merge:true});
   },1000);
 }
 
-sendBtn.onclick = ()=>{ sendMessage(); }
+// Send message
+sendBtn.onclick=()=>{ sendMessage(); }
 function sendMessage(){
-  const text = msgInput.value.trim();
+  const text=msgInput.value.trim();
   if(!text) return;
   db.collection("messages").add({
     text,
-    user: currentUser,
-    time: firebase.firestore.Timestamp.now(),
-    status: "sent"
+    user:currentUser,
+    time:firebase.firestore.Timestamp.now(),
+    status:"sent"
   });
   msgInput.value="";
 }
@@ -141,25 +151,25 @@ let lastMsgDate="";
 db.collection("messages").orderBy("time").onSnapshot(snapshot=>{
   messagesDiv.innerHTML="";
   snapshot.forEach(doc=>{
-    const msg = doc.data();
+    const msg=doc.data();
     if(msg.deletedFor && msg.deletedFor.includes(currentUser)) return;
-    const msgDate = msg.time.toDate();
-    const dateStr = msgDate.toLocaleDateString();
+    const msgDate=msg.time.toDate();
+    const dateStr=msgDate.toLocaleDateString();
     if(dateStr!==lastMsgDate){
-      const sep = document.createElement("div");
+      const sep=document.createElement("div");
       sep.className="date-separator";
-      sep.innerText = (dateStr===new Date().toLocaleDateString())?"Today":dateStr;
+      sep.innerText=(dateStr===new Date().toLocaleDateString())?"Today":dateStr;
       messagesDiv.appendChild(sep);
       lastMsgDate=dateStr;
     }
-    const div = document.createElement("div");
-    div.className = (msg.user===currentUser)?"msg mine":"msg other";
-    div.innerHTML = `<span>${msg.text}</span><div class="time">${msg.user===currentUser?formatTime(msgDate)+" "+getStatusIcon(msg.status):formatTime(msgDate)}</div>`;
+    const div=document.createElement("div");
+    div.className=(msg.user===currentUser)?"msg mine":"msg other";
+    div.innerHTML=`<span>${msg.text}</span><div class="time">${msg.user===currentUser?formatTime(msgDate)+" "+getStatusIcon(msg.status):formatTime(msgDate)}</div>`;
     if(msg.user===currentUser){
-      const delMe = document.createElement("span");
+      const delMe=document.createElement("span");
       delMe.className="delete-btn"; delMe.innerText="Delete for me";
       delMe.onclick=()=>deleteMsg(doc.id,false);
-      const delBoth = document.createElement("span");
+      const delBoth=document.createElement("span");
       delBoth.className="delete-btn"; delBoth.innerText="Delete for both";
       delBoth.onclick=()=>deleteMsg(doc.id,true);
       div.appendChild(delMe);
@@ -178,30 +188,28 @@ function deleteMsg(id,forBoth){
 
 // Header status
 db.collection("status").doc(friendUser).onSnapshot(snap=>{
-  const s = snap.data();
+  const s=snap.data();
   if(s){
-    chatStatus.innerText = s.online?"online":s.lastSeen?`last seen ${formatLastSeen(s.lastSeen)}`:"offline";
-    typingDiv.innerText = s.typing?"Typing...":"";
+    chatStatus.innerText=s.online?"online":s.lastSeen?`last seen ${formatLastSeen(s.lastSeen)}`:"offline";
+    typingDiv.innerText=s.typing?"Typing...":"";
   }
 });
 
 // Online / last seen
 function setCurrentOnline(){
   db.collection("status").doc(currentUser).set({online:true,typing:false},{merge:true});
-  window.addEventListener("beforeunload", ()=>{
-    db.collection("status").doc(currentUser).set({
-      online:false,
-      lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-    },{merge:true});
+  window.addEventListener("beforeunload",()=>{
+    db.collection("status").doc(currentUser).set({online:false,lastSeen:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
   });
 }
 
 // Utils
 function formatTime(d){return d.getHours().toString().padStart(2,'0')+":"+d.getMinutes().toString().padStart(2,'0');}
-function formatLastSeen(ts){if(!ts) return ""; const d = ts.toDate? ts.toDate() : new Date(ts); return formatTime(d);}
-function getStatusIcon(status){
-  if(status==="sent") return "✔"; if(status==="delivered") return "✔✔"; if(status==="seen") return '<span style="color:#ff69b4;">✔✔</span>'; return "";
-}
+function formatLastSeen(ts){if(!ts) return ""; const d=ts.toDate? ts.toDate() : new Date(ts); return formatTime(d);}
+function getStatusIcon(status){if(status==="sent") return "✔"; if(status==="delivered") return "✔✔"; if(status==="seen") return '<span style="color:#ff69b4;">✔✔</span>'; return "";}
+
+// Initialize chat placeholder
+function initChat(){ messagesDiv.innerHTML=""; typingDiv.innerText=""; loginStatus.innerText=""; loadingBar.style.width="0"; }
 </script>
 </body>
 </html>
