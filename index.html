@@ -20,9 +20,10 @@ button{background:#128c7e;color:#fff;border:none;border-radius:4px}
 #headerName{font-weight:bold}
 #headerStatus{font-size:12px}
 #messages{flex:1;overflow-y:auto;padding:10px}
-.msg{max-width:70%;padding:8px;border-radius:8px;margin:6px 0;word-wrap:break-word}
+.msg{max-width:70%;padding:8px;border-radius:8px;margin:6px 0;word-wrap:break-word;transition:opacity .4s}
 .right{margin-left:auto;background:#dcf8c6}
 .left{background:#fff}
+.fade{opacity:0}
 .small{font-size:10px;text-align:right;color:#555}
 .pink{color:#e91e63}
 .date{text-align:center;font-size:12px;color:#666;margin:10px}
@@ -30,6 +31,7 @@ button{background:#128c7e;color:#fff;border:none;border-radius:4px}
 #sendBox{display:flex;background:#fff;padding:5px}
 #sendBox input{flex:1}
 .eye{cursor:pointer;margin-left:-30px}
+.undo{color:#128c7e;font-size:12px;cursor:pointer}
 </style>
 </head>
 
@@ -65,7 +67,6 @@ button{background:#128c7e;color:#fff;border:none;border-radius:4px}
 </div>
 
 <script>
-/* ---------- FIREBASE ---------- */
 const firebaseConfig={
  apiKey:"AIzaSyB57DbuZWjQjaekNFkUrYmABql_yl-KFnA",
  authDomain:"unknownchat-bbd4b.firebaseapp.com",
@@ -75,11 +76,9 @@ firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth();
 const db=firebase.firestore();
 
-/* ---------- DOM FIX (IMPORTANT) ---------- */
 const loginDiv=document.getElementById("login");
 const chatDiv=document.getElementById("chat");
 
-/* ---------- USERS ---------- */
 const users={
  foreverus10:{email:"unknownmarch1@gmail.com",chat:"Kakka"},
  foreverus29:{email:"unknownmarch001@gmail.com",chat:"Bacha"}
@@ -87,102 +86,109 @@ const users={
 
 let me="",other="",typingTimer;
 
-/* ---------- LOGIN ---------- */
-function loginUser(){
- const u=username.value;
- const p=password.value;
- if(!users[u]){error.innerText="Invalid user";return;}
+function togglePass(){
+ password.type=password.type==="password"?"text":"password";
+}
 
- auth.signInWithEmailAndPassword(users[u].email,p)
- .then(()=>{
-  me=u;
-  other=Object.keys(users).find(x=>x!==u);
+function loginUser(){
+ const u=username.value,p=password.value;
+ if(!users[u]){error.innerText="Invalid user";return;}
+ auth.signInWithEmailAndPassword(users[u].email,p).then(()=>{
+  me=u; other=Object.keys(users).find(x=>x!==u);
   loginDiv.style.display="none";
   chatDiv.style.display="flex";
   headerName.innerText=users[other].chat;
   setStatus(true);
   loadChat();
- })
- .catch(e=>error.innerText=e.message);
+ }).catch(e=>error.innerText=e.message);
 }
 
-/* ---------- LOGOUT ---------- */
 function logout(){
  setStatus(false);
  auth.signOut();
  location.reload();
 }
 
-/* ---------- PASSWORD EYE ---------- */
-function togglePass(){
- password.type=password.type==="password"?"text":"password";
-}
-
-/* ---------- STATUS ---------- */
 function setStatus(v){
  db.collection("status").doc(me).set({
-  online:v,
-  typing:false,
-  lastSeen:Date.now()
+  online:v,typing:false,lastSeen:Date.now()
  });
  window.onbeforeunload=()=>setStatus(false);
 }
 
-/* ---------- TYPING ---------- */
 msg.oninput=()=>{
  clearTimeout(typingTimer);
  db.collection("status").doc(me).update({typing:true});
- typingTimer=setTimeout(()=>{
-  db.collection("status").doc(me).update({typing:false});
- },1000);
+ typingTimer=setTimeout(()=>db.collection("status").doc(me).update({typing:false}),1000);
 };
 
-/* ---------- SEND MESSAGE ---------- */
 function sendMsg(){
  if(!msg.value)return;
  db.collection("messages").add({
-  from:me,
-  to:other,
-  text:msg.value,
-  time:Date.now(),
-  seen:false
+  from:me,to:other,text:msg.value,time:Date.now(),
+  seen:false,deleted:false,deletedFor:[]
  });
  msg.value="";
  db.collection("status").doc(me).update({typing:false});
 }
 
-/* ---------- LOAD CHAT ---------- */
 function loadChat(){
  let lastDate="";
  db.collection("messages").orderBy("time").onSnapshot(snap=>{
   messages.innerHTML="";
   snap.forEach(doc=>{
    const m=doc.data();
-   if((m.from===me && m.to===other)||(m.from===other && m.to===me)){
+   if(((m.from===me&&m.to===other)||(m.from===other&&m.to===me))
+    && !(m.deletedFor||[]).includes(me)){
     const d=new Date(m.time).toDateString();
     if(d!==lastDate){
      messages.innerHTML+=`<div class="date">${d}</div>`;
      lastDate=d;
     }
-    const t=new Date(m.time).toLocaleString("en-US",{hour:"numeric",minute:"numeric",hour12:true});
+    const time=new Date(m.time).toLocaleString("en-US",{hour:"numeric",minute:"numeric",hour12:true});
     const div=document.createElement("div");
     div.className="msg "+(m.from===me?"right":"left");
-    div.innerHTML=`${m.text}<div class="small">${t} ${
-      m.from===me?(m.seen?"<span class='pink'>✔✔</span>":"✔"):""
-    }</div>`;
+    div.innerHTML=(m.deleted?`<i>This message was deleted</i>`:m.text)+
+    `<div class="small">${time} ${m.from===me?(m.seen?"<span class='pink'>✔✔</span>":"✔"):""}</div>`;
+
     if(m.from!==me && !m.seen) doc.ref.update({seen:true});
+
+    let timer,undoTimer;
+    div.addEventListener("mousedown",start);
+    div.addEventListener("touchstart",start);
+    div.addEventListener("mouseup",stop);
+    div.addEventListener("touchend",stop);
+
+    function start(){
+     timer=setTimeout(()=>{
+      if(!confirm("Delete this message?")) return;
+      const both=confirm("OK = Delete for BOTH\nCancel = Delete for ME");
+      div.classList.add("fade");
+      setTimeout(()=>{
+       if(both){
+        doc.ref.update({deleted:true});
+       }else{
+        doc.ref.update({
+         deletedFor:firebase.firestore.FieldValue.arrayUnion(me)
+        });
+       }
+      },300);
+     },600);
+    }
+    function stop(){clearTimeout(timer);}
+
     messages.appendChild(div);
    }
   });
   messages.scrollTop=messages.scrollHeight;
  });
 
- db.collection("status").doc(other).onSnapshot(doc=>{
-  const s=doc.data();
+ db.collection("status").doc(other).onSnapshot(d=>{
+  const s=d.data();
   if(s?.online) headerStatus.innerText="online";
   else if(s?.lastSeen){
-   const t=new Date(s.lastSeen).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-   headerStatus.innerText="last seen "+t;
+   headerStatus.innerText="last seen "+
+   new Date(s.lastSeen).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
   } else headerStatus.innerText="offline";
   typing.innerText=s?.typing?"typing...":"";
  });
