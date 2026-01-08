@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -14,16 +14,18 @@ body,html{margin:0;height:100%;font-family:Arial;background:#e5ddd5}
 #login,#chat{max-width:420px;margin:auto;height:100%}
 #login{display:flex;flex-direction:column;justify-content:center;padding:20px}
 input,button{padding:12px;margin:6px 0;font-size:16px}
-button{background:#128c7e;color:#fff;border:none}
+button{background:#128c7e;color:#fff;border:none;border-radius:4px}
 #chat{display:none;flex-direction:column}
 #header{background:#075e54;color:#fff;padding:10px;display:flex;justify-content:space-between;align-items:center}
+#headerName{font-weight:bold}
+#headerStatus{font-size:12px}
 #messages{flex:1;overflow-y:auto;padding:10px}
-.msg{max-width:70%;padding:8px;border-radius:8px;margin:6px 0}
+.msg{max-width:70%;padding:8px;border-radius:8px;margin:6px 0;word-wrap:break-word}
 .right{margin-left:auto;background:#dcf8c6}
 .left{background:#fff}
-.small{font-size:10px;text-align:right}
+.small{font-size:10px;text-align:right;color:#555}
 .pink{color:#e91e63}
-.date{font-size:12px;text-align:center;color:#555;margin:10px}
+.date{text-align:center;font-size:12px;color:#666;margin:10px}
 #typing{font-size:12px;color:#555;padding-left:10px;height:18px}
 #sendBox{display:flex;background:#fff;padding:5px}
 #sendBox input{flex:1}
@@ -40,8 +42,8 @@ button{background:#128c7e;color:#fff;border:none}
 <input id="password" type="password" placeholder="Password" style="flex:1">
 <span class="eye" onclick="togglePass()">👁️</span>
 </div>
-<button onclick="login()">Login</button>
-<p id="error"></p>
+<button onclick="loginUser()">Login</button>
+<p id="error" style="color:red"></p>
 </div>
 
 <div id="chat">
@@ -58,11 +60,12 @@ button{background:#128c7e;color:#fff;border:none}
 
 <div id="sendBox">
 <input id="msg" placeholder="Type a message">
-<button onclick="send()">Send</button>
+<button onclick="sendMsg()">Send</button>
 </div>
 </div>
 
 <script>
+/* ---------- FIREBASE ---------- */
 const firebaseConfig={
  apiKey:"AIzaSyB57DbuZWjQjaekNFkUrYmABql_yl-KFnA",
  authDomain:"unknownchat-bbd4b.firebaseapp.com",
@@ -72,6 +75,11 @@ firebase.initializeApp(firebaseConfig);
 const auth=firebase.auth();
 const db=firebase.firestore();
 
+/* ---------- DOM FIX (IMPORTANT) ---------- */
+const loginDiv=document.getElementById("login");
+const chatDiv=document.getElementById("chat");
+
+/* ---------- USERS ---------- */
 const users={
  foreverus10:{email:"unknownmarch1@gmail.com",chat:"Kakka"},
  foreverus29:{email:"unknownmarch001@gmail.com",chat:"Bacha"}
@@ -79,87 +87,107 @@ const users={
 
 let me="",other="",typingTimer;
 
-function togglePass(){
- password.type=password.type==="password"?"text":"password";
-}
-
-function login(){
- const u=username.value,p=password.value;
+/* ---------- LOGIN ---------- */
+function loginUser(){
+ const u=username.value;
+ const p=password.value;
  if(!users[u]){error.innerText="Invalid user";return;}
- auth.signInWithEmailAndPassword(users[u].email,p).then(()=>{
-  me=u; other=Object.keys(users).find(x=>x!==u);
-  login.style.display="none"; chat.style.display="flex";
+
+ auth.signInWithEmailAndPassword(users[u].email,p)
+ .then(()=>{
+  me=u;
+  other=Object.keys(users).find(x=>x!==u);
+  loginDiv.style.display="none";
+  chatDiv.style.display="flex";
   headerName.innerText=users[other].chat;
   setStatus(true);
-  load();
- }).catch(e=>error.innerText=e.message);
+  loadChat();
+ })
+ .catch(e=>error.innerText=e.message);
 }
 
+/* ---------- LOGOUT ---------- */
 function logout(){
  setStatus(false);
  auth.signOut();
  location.reload();
 }
 
+/* ---------- PASSWORD EYE ---------- */
+function togglePass(){
+ password.type=password.type==="password"?"text":"password";
+}
+
+/* ---------- STATUS ---------- */
 function setStatus(v){
  db.collection("status").doc(me).set({
-  online:v,typing:false,lastSeen:Date.now()
+  online:v,
+  typing:false,
+  lastSeen:Date.now()
  });
  window.onbeforeunload=()=>setStatus(false);
 }
 
+/* ---------- TYPING ---------- */
 msg.oninput=()=>{
  clearTimeout(typingTimer);
  db.collection("status").doc(me).update({typing:true});
- typingTimer=setTimeout(()=>db.collection("status").doc(me).update({typing:false}),1000);
+ typingTimer=setTimeout(()=>{
+  db.collection("status").doc(me).update({typing:false});
+ },1000);
 };
 
-function send(){
+/* ---------- SEND MESSAGE ---------- */
+function sendMsg(){
  if(!msg.value)return;
  db.collection("messages").add({
-  from:me,to:other,text:msg.value,
-  time:Date.now(),seen:false
+  from:me,
+  to:other,
+  text:msg.value,
+  time:Date.now(),
+  seen:false
  });
  msg.value="";
  db.collection("status").doc(me).update({typing:false});
 }
 
-function load(){
+/* ---------- LOAD CHAT ---------- */
+function loadChat(){
  let lastDate="";
- db.collection("messages").orderBy("time").onSnapshot(s=>{
+ db.collection("messages").orderBy("time").onSnapshot(snap=>{
   messages.innerHTML="";
-  s.forEach(d=>{
-   const m=d.data();
+  snap.forEach(doc=>{
+   const m=doc.data();
    if((m.from===me && m.to===other)||(m.from===other && m.to===me)){
-    const date=new Date(m.time).toDateString();
-    if(date!==lastDate){
-     messages.innerHTML+=`<div class="date">${date}</div>`;
-     lastDate=date;
+    const d=new Date(m.time).toDateString();
+    if(d!==lastDate){
+     messages.innerHTML+=`<div class="date">${d}</div>`;
+     lastDate=d;
     }
-    const t=new Date(m.time);
-    const time=t.toLocaleString("en-US",{hour:"numeric",minute:"numeric",hour12:true});
+    const t=new Date(m.time).toLocaleString("en-US",{hour:"numeric",minute:"numeric",hour12:true});
     const div=document.createElement("div");
     div.className="msg "+(m.from===me?"right":"left");
-    div.innerHTML=`${m.text}<div class="small">${time} ${
+    div.innerHTML=`${m.text}<div class="small">${t} ${
       m.from===me?(m.seen?"<span class='pink'>✔✔</span>":"✔"):""
     }</div>`;
-    if(m.from!==me && !m.seen) d.ref.update({seen:true});
+    if(m.from!==me && !m.seen) doc.ref.update({seen:true});
     messages.appendChild(div);
    }
   });
   messages.scrollTop=messages.scrollHeight;
  });
 
- db.collection("status").doc(other).onSnapshot(d=>{
-  const s=d.data();
+ db.collection("status").doc(other).onSnapshot(doc=>{
+  const s=doc.data();
   if(s?.online) headerStatus.innerText="online";
   else if(s?.lastSeen){
-   const t=new Date(s.lastSeen);
-   headerStatus.innerText="last seen "+t.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+   const t=new Date(s.lastSeen).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+   headerStatus.innerText="last seen "+t;
   } else headerStatus.innerText="offline";
   typing.innerText=s?.typing?"typing...":"";
  });
 }
 </script>
+
 </body>
 </html>
